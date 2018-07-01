@@ -1,4 +1,4 @@
-FROM microsoft/dotnet:2.0-sdk AS build-env
+FROM microsoft/dotnet:2.1.301-sdk AS build-env
 WORKDIR /app
 
 # copy csproj and restore as distinct layers
@@ -7,7 +7,7 @@ RUN dotnet restore
 
 # build
 RUN dotnet build
-RUN dotnet publish -f netcoreapp2.0 -c Release -o out
+RUN dotnet publish -f netcoreapp2.1 -c Release -o out
 
 FROM gcc:7 AS build-env-2
 WORKDIR /app
@@ -19,7 +19,7 @@ COPY src/*.h ./
 # build
 RUN gcc -shared -o libcomWrapper.so -fPIC comWrapper.c
 
-FROM microsoft/dotnet:2.0.0-runtime
+FROM microsoft/dotnet:2.1.1-runtime
 
 WORKDIR /app
 

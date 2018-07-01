@@ -1,4 +1,4 @@
-FROM microsoft/dotnet:2.0.0-runtime-nanoserver-1709
+FROM microsoft/dotnet:2.1.1-runtime-nanoserver-1709
 
 ARG EXE_DIR=.
 

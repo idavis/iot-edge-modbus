@@ -8,7 +8,7 @@ COPY src/*.h ./
 # build
 RUN gcc -shared -o libcomWrapper.so -fPIC comWrapper.c
 
-FROM microsoft/dotnet:2.0.0-runtime-stretch-arm32v7
+FROM microsoft/dotnet:2.1.1-runtime-stretch-slim-arm32v7
 
 ARG EXE_DIR=.
 

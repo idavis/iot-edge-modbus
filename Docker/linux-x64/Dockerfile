@@ -8,7 +8,7 @@ COPY src/*.h ./
 # build
 RUN gcc -shared -o libcomWrapper.so -fPIC comWrapper.c
 
-FROM microsoft/dotnet:2.0.0-runtime
+FROM microsoft/dotnet:2.1.1-runtime
 
 ARG EXE_DIR=.
 
