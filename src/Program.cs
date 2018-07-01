@@ -28,7 +28,7 @@ namespace Modbus.Containers
         static object message_lock = new object();
         static List<ModbusOutMessage> result = new List<ModbusOutMessage>();
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
 #if IOT_EDGE
             // Install CA certificate
@@ -36,13 +36,13 @@ namespace Modbus.Containers
 #endif
 
             // Initialize Edge Module
-            InitEdgeModule().Wait();
+            await InitEdgeModule();
 
             // Wait until the app unloads or is cancelled
             var cts = new CancellationTokenSource();
             AssemblyLoadContext.Default.Unloading += (ctx) => cts.Cancel();
             Console.CancelKeyPress += (sender, cpe) => cts.Cancel();
-            WhenCancelled(cts.Token).Wait();
+            await WhenCancelled(cts.Token);
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace Modbus.Containers
                 }
                 ITransportSettings[] settings = { mqttSettings };
 
-                DeviceClient ioTHubModuleClient = DeviceClient.CreateFromConnectionString(connectionString, settings);
+                var ioTHubModuleClient = ModuleClient.CreateFromConnectionString(connectionString, settings);
                 await ioTHubModuleClient.OpenAsync();
                 Console.WriteLine("IoT Hub module client initialized.");
 
@@ -125,7 +125,6 @@ namespace Modbus.Containers
                     Console.WriteLine("Error when initializing module: {0}", exception);
                 }
             }
-
         }
 
         /// <summary>
@@ -133,7 +132,7 @@ namespace Modbus.Containers
         /// It just pipe the messages without any change.
         /// It prints all the incoming messages.
         /// </summary>
-        static async Task<MethodResponse> PipeMessage(MethodRequest message, object userContext)
+        static async Task<MessageResponse> PipeMessage(Message message, object userContext)
         {
             Console.WriteLine("Modbus Writer - Received command");
             int counterValue = Interlocked.Increment(ref m_counter);
@@ -147,7 +146,7 @@ namespace Modbus.Containers
             DeviceClient ioTHubModuleClient = userContextValues.Item1;
             Slaves.ModuleHandle moduleHandle = userContextValues.Item2;
 
-            byte[] messageBytes = message.Data;
+            byte[] messageBytes = message.GetBytes();
             string messageString = Encoding.UTF8.GetString(messageBytes);
             Console.WriteLine($"Received message: {counterValue}, Body: [{messageString}]");
 
@@ -173,16 +172,15 @@ namespace Modbus.Containers
                     }
                 }
             }
-            var response = new MethodResponse((int) System.Net.HttpStatusCode.OK);
-            return await Task.FromResult(response);
+            return MessageResponse.Completed;
         }
 
-        /// <summary>�
-        /// Callback to handle Twin desired properties updates�
-        /// </summary>�
+        /// <summary>
+        /// Callback to handle Twin desired properties updates
+        /// </summary>
         static async Task OnDesiredPropertiesUpdate(TwinCollection desiredProperties, object userContext)
         {
-            DeviceClient ioTHubModuleClient = userContext as DeviceClient;
+            var ioTHubModuleClient = userContext as ModuleClient;
 
             try
             {
@@ -231,7 +229,7 @@ namespace Modbus.Containers
         /// <summary>
         /// Update Start from module Twin. 
         /// </summary>
-        static async Task UpdateStartFromTwin(TwinCollection desiredProperties, DeviceClient ioTHubModuleClient)
+        static async Task UpdateStartFromTwin(TwinCollection desiredProperties, ModuleClient ioTHubModuleClient)
         {
             ModuleConfig config;
             Slaves.ModuleHandle moduleHandle;
@@ -285,10 +283,10 @@ namespace Modbus.Containers
 
                     if (moduleHandle != null)
                     {
-                        var userContext = new Tuple<DeviceClient, Slaves.ModuleHandle>(ioTHubModuleClient, moduleHandle);
+                        var userContext = (ioTHubModuleClient, moduleHandle);
 #if IOT_EDGE
                     // Register callback to be called when a message is received by the module
-                    await ioTHubModuleClient.SetMethodHandlerAsync(
+                    await ioTHubModuleClient.SetInputMessageHandlerAsync(
                     "input1",
                     PipeMessage,
                     userContext);
@@ -308,15 +306,7 @@ namespace Modbus.Containers
         /// <returns></returns>
         static async Task Start(object userContext)
         {
-            var userContextValues = userContext as Tuple<DeviceClient, Slaves.ModuleHandle>;
-            if (userContextValues == null)
-            {
-                throw new InvalidOperationException("UserContext doesn't contain " +
-                    "expected values");
-            }
-
-            DeviceClient ioTHubModuleClient = userContextValues.Item1;
-            Slaves.ModuleHandle moduleHandle = userContextValues.Item2;
+            var (ioTHubModuleClient, moduleHandle) = ((ModuleClient, Slaves.ModuleHandle))userContext;
 
             foreach (ModbusSlaveSession s in moduleHandle.ModbusSessionList)
             {
@@ -365,18 +355,14 @@ namespace Modbus.Containers
         /// <returns></returns>
         static async Task Receive(object userContext)
         {
-            var userContextValues = userContext as Tuple<DeviceClient, Slaves.ModuleHandle>;
-            if (userContextValues == null)
-            {
-                throw new InvalidOperationException("UserContext doesn't contain " +
-                    "expected values");
-            }
-            DeviceClient ioTHubModuleClient = userContextValues.Item1;
+            var (ioTHubModuleClient, moduleHandle) = ((ModuleClient, Slaves.ModuleHandle))userContext;
+ 
             var timeout = TimeSpan.FromSeconds(3);
             while (m_run)
             {
                 try
                 {
+                    // TODO: This requires a device client
                     Message message = await ioTHubModuleClient.ReceiveAsync(timeout);
                     if (message != null)
                     {
@@ -391,6 +377,5 @@ namespace Modbus.Containers
                 }
             }
         }
-        
     }
 }
