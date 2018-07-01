@@ -133,7 +133,7 @@ namespace Modbus.Containers
         /// It just pipe the messages without any change.
         /// It prints all the incoming messages.
         /// </summary>
-        static async Task<MessageResponse> PipeMessage(Message message, object userContext)
+        static async Task<MethodResponse> PipeMessage(MethodRequest message, object userContext)
         {
             Console.WriteLine("Modbus Writer - Received command");
             int counterValue = Interlocked.Increment(ref m_counter);
@@ -147,7 +147,7 @@ namespace Modbus.Containers
             DeviceClient ioTHubModuleClient = userContextValues.Item1;
             Slaves.ModuleHandle moduleHandle = userContextValues.Item2;
 
-            byte[] messageBytes = message.GetBytes();
+            byte[] messageBytes = message.Data;
             string messageString = Encoding.UTF8.GetString(messageBytes);
             Console.WriteLine($"Received message: {counterValue}, Body: [{messageString}]");
 
@@ -173,12 +173,13 @@ namespace Modbus.Containers
                     }
                 }
             }
-            return MessageResponse.Completed;
+            var response = new MethodResponse((int) System.Net.HttpStatusCode.OK);
+            return await Task.FromResult(response);
         }
 
-        /// <summary> 
-        /// Callback to handle Twin desired properties updates 
-        /// </summary> 
+        /// <summary>ï¿½
+        /// Callback to handle Twin desired properties updatesï¿½
+        /// </summary>ï¿½
         static async Task OnDesiredPropertiesUpdate(TwinCollection desiredProperties, object userContext)
         {
             DeviceClient ioTHubModuleClient = userContext as DeviceClient;
@@ -187,7 +188,7 @@ namespace Modbus.Containers
             {
 #if IOT_EDGE
                 // stop all activities while updating configuration
-                await ioTHubModuleClient.SetInputMessageHandlerAsync(
+                await ioTHubModuleClient.SetMethodHandlerAsync(
                 "input1",
                 DummyCallBack,
                 null);
@@ -221,10 +222,10 @@ namespace Modbus.Containers
         /// <param name="message"></param>
         /// <param name="userContext"></param>
         /// <returns></returns>
-        static async Task<MessageResponse> DummyCallBack(Message message, object userContext)
+        static Task<MethodResponse> DummyCallBack(MethodRequest message, object userContext)
         {
-            await Task.Delay(TimeSpan.FromSeconds(0));
-            return MessageResponse.Abandoned;
+            var response = new MethodResponse((int) System.Net.HttpStatusCode.OK);
+            return Task.FromResult(response);
         }
 
         /// <summary>
@@ -287,7 +288,7 @@ namespace Modbus.Containers
                         var userContext = new Tuple<DeviceClient, Slaves.ModuleHandle>(ioTHubModuleClient, moduleHandle);
 #if IOT_EDGE
                     // Register callback to be called when a message is received by the module
-                    await ioTHubModuleClient.SetInputMessageHandlerAsync(
+                    await ioTHubModuleClient.SetMethodHandlerAsync(
                     "input1",
                     PipeMessage,
                     userContext);
